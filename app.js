@@ -543,6 +543,7 @@ const EVENTS = [
     choices:[
       { label:'Rush repair crew ($1,500)', cost:1500, effect:(s)=>{ s.approval+=2; } },
       { label:'Standard repair schedule ($500)', cost:500, effect:(s)=>{ s.approval-=4; logFlavor('Residents near Main Street report low water pressure for most of the week.'); } },
+      { label:'Crews patch it with what\u2019s on hand (no cost)', cost:0, effect:(s)=>{ s.approval-=7; s.pollution=Math.min(100,s.pollution+3); logFlavor('A makeshift patch job on Main Street holds, for now \u2014 residents are not thrilled.'); } },
     ]
   },
   {
@@ -561,7 +562,7 @@ const EVENTS = [
     body:(s)=>`Dr. Boone: "We\u2019re looking at a stretch of dangerous heat. I\u2019d like to open cooling centers for folks without reliable AC."`,
     choices:[
       { label:'Open cooling centers ($450)', cost:450, effect:(s)=>{ s.approval+=3; } },
-      { label:'Issue a public advisory only', cost:50, effect:(s)=>{ s.approval-=1; } },
+      { label:'Issue a public advisory only (no cost)', cost:0, effect:(s)=>{ s.approval-=1; } },
     ]
   },
   {
@@ -618,12 +619,11 @@ function showEvent(ev){
     const btn = document.createElement('button');
     btn.className = 'choice';
     btn.style.cssText = 'background:var(--ink-3);border:1px solid var(--ink-3);color:var(--paper);border-radius:6px;padding:9px 10px;text-align:left;width:100%;margin-bottom:7px;font-size:12.5px;';
-    btn.innerHTML = `${choice.label}` + (choice.cost ? `<div class="ev-cost">Cost: $${choice.cost.toLocaleString()}</div>` : '');
+    const tooExpensive = choice.cost && choice.cost>STATE.treasury;
+    btn.innerHTML = `${choice.label}` + (choice.cost ? `<div class="ev-cost">Cost: $${choice.cost.toLocaleString()}${tooExpensive?' \u2014 will put treasury into debt':''}</div>` : '');
     btn.onclick = ()=>{
-      if(choice.cost && choice.cost>STATE.treasury){
-        flashEgg('\u{1F4B8}','Insufficient funds for that option right now.');
-        return;
-      }
+      // Going into debt is allowed (mirrors how weekly budget deficits already work) so the
+      // modal can never trap the player with no affordable option.
       if(choice.cost) STATE.treasury -= choice.cost;
       choice.effect(STATE);
       if(ev.achId) unlockAchievement(ev.achId);
@@ -633,6 +633,19 @@ function showEvent(ev){
     };
     choicesEl.appendChild(btn);
   });
+  // Emergency escape valve: always available, costs only approval, guarantees the modal
+  // can be dismissed even if every scripted choice were somehow unaffordable or broken.
+  const skipBtn = document.createElement('button');
+  skipBtn.className = 'choice';
+  skipBtn.style.cssText = 'background:transparent;border:1px dashed var(--ink-3);color:var(--slate);border-radius:6px;padding:7px 10px;text-align:left;width:100%;font-size:11.5px;';
+  skipBtn.innerHTML = 'Table this for now (small approval hit)';
+  skipBtn.onclick = ()=>{
+    STATE.approval = Math.max(1, STATE.approval-1.5);
+    closeModal('newsflash');
+    STATE.pendingEvent = null;
+    refreshUI();
+  };
+  choicesEl.appendChild(skipBtn);
   openModal('newsflash');
 }
 
@@ -898,6 +911,12 @@ function openLandmarkPicker(x,y){
     };
     choicesEl.appendChild(btn);
   });
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'choice';
+  cancelBtn.style.cssText = 'background:transparent;border:1px dashed var(--ink-3);color:var(--slate);border-radius:6px;padding:7px 10px;text-align:left;width:100%;font-size:11.5px;';
+  cancelBtn.innerHTML = 'Cancel';
+  cancelBtn.onclick = ()=>{ closeModal('newsflash'); };
+  choicesEl.appendChild(cancelBtn);
   openModal('newsflash');
 }
 
@@ -1120,12 +1139,61 @@ function renderAchievementsTab(){
   el.innerHTML = html;
 }
 
+function renderHelpTab(){
+  const el = document.getElementById('panelcontent');
+  let html = '';
+
+  html += `<div class="section-title">How to Play</div>`;
+  html += `<div class="help-block">
+    <p>You\u2019re the mayor of ${STATE.cityName}. Pick tools on the left, then click (or click-and-drag) tiles on the map to build. Time passes automatically \u2014 use the speed buttons in the top bar to pause, or run things faster once you\u2019re comfortable.</p>
+  </div>`;
+
+  html += `<div class="section-title">Tax Rates \u2014 How Fast Do They Work?</div>`;
+  html += `<div class="help-block">
+    <p>Tax changes take effect <b>immediately</b> \u2014 there\u2019s no delay. The very next week\u2019s budget uses whatever rate you just set, and it also immediately changes how attractive new development is.</p>
+    <p>That said, the <i>visible</i> effects play out over time: raising taxes doesn\u2019t shrink existing buildings overnight, but it does make zones less likely to grow further (and slightly more likely to decay) from that week forward. Likewise, lowering taxes doesn\u2019t cause instant growth \u2014 it just improves the odds each week going forward.</p>
+    <p>Rule of thumb: small, steady tax rates (roughly 6\u201310%) tend to keep growth healthy. Pushing rates much above 12\u201314% will choke off new development even if your budget looks better in the short term.</p>
+  </div>`;
+
+  html += `<div class="section-title">What To Watch Each Week</div>`;
+  html += `<div class="help-priority"><span class="hp-num">1</span><div><b>Net /wk</b> in the top bar. If it\u2019s red for several weeks running, you\u2019re heading toward debt \u2014 either raise taxes slightly, slow down on new civic buildings, or grow your commercial/industrial tax base.</div></div>`;
+  html += `<div class="help-priority"><span class="hp-num">2</span><div><b>Unemployment</b> (top bar / City tab). High unemployment quietly drags down approval and pushes crime up. It usually means you have more housing than jobs \u2014 zone more commercial and industrial, not more residential.</div></div>`;
+  html += `<div class="help-priority"><span class="hp-num">3</span><div><b>Approval</b>. This is your re-election lifeline and it moves slowly on purpose \u2014 it drifts toward a "target" each week rather than jumping, so don\u2019t panic over one bad week. Sustained problems (crime, pollution, traffic, unemployment, high taxes) are what really hurt it over time.</div></div>`;
+  html += `<div class="help-priority"><span class="hp-num">4</span><div><b>Service coverage</b> (City tab). If population is growing faster than your schools/clinics/police coverage, build more \u2014 coverage is based on how many <i>developed</i> zone tiles fall within a building\u2019s radius, not just whether you have one somewhere in town.</div></div>`;
+
+  html += `<div class="section-title">Zoning Basics</div>`;
+  html += `<div class="help-block"><ul>
+    <li><b>Every zoned tile needs adjacent road</b> to grow. No road touching it, and it'll stall or even decay.</li>
+    <li><b>Residential</b> growth responds most to low crime, parks, schools, and clinics.</li>
+    <li><b>Commercial</b> growth responds most to nearby population (it needs customers).</li>
+    <li><b>Industrial</b> is the least picky about services but adds the most pollution and traffic.</li>
+    <li>A healthy city usually keeps jobs (commercial + industrial) roughly in balance with population, so check unemployment before zoning more housing.</li>
+  </ul></div>`;
+
+  html += `<div class="section-title">Money Troubles</div>`;
+  html += `<div class="help-block">
+    <p>Running a deficit isn\u2019t an instant game over \u2014 your treasury can go negative, and the city keeps running, just with a real approval penalty. If you ever face a crisis event you genuinely can\u2019t afford, every event includes a way to decline or go into debt rather than locking you out \u2014 there\u2019s always a "table this for now" option at the bottom of any newsflash.</p>
+  </div>`;
+
+  html += `<div class="section-title">Starting City</div>`;
+  html += `<div class="help-block">
+    <p>${STATE.cityName} doesn\u2019t start from an empty field \u2014 you inherit a small existing downtown (the Threefoot Building, a few blocks of housing and shops, and minimal services). It\u2019s deliberately a little undersized, so expect early gaps in coverage as the population grows. That\u2019s normal, not a sign you\u2019re doing something wrong.</p>
+  </div>`;
+
+  html += `<div class="section-title">Elections & Difficulty</div>`;
+  html += `<div class="help-block">
+    <p>Each term runs ${STATE.termLength} weeks (about 4 years). Winning re-election depends mostly on your approval rating heading into election week, with a little randomness mixed in. Difficulty changes your starting treasury, how often random events fire, and how approval naturally drifts over time \u2014 it doesn\u2019t change the core rules.</p>
+  </div>`;
+
+  el.innerHTML = html;
+}
 function renderSidePanel(){
   if(activeTab==='advisors') renderAdvisorsTab();
   else if(activeTab==='budget') renderBudgetTab();
   else if(activeTab==='city') renderCityTab();
   else if(activeTab==='policy') renderPolicyTab();
   else if(activeTab==='achievements') renderAchievementsTab();
+  else if(activeTab==='help') renderHelpTab();
 }
 
 function refreshUI(){
@@ -1176,6 +1244,55 @@ document.querySelectorAll('.diff-opt').forEach(btn=>{
   };
 });
 
+/* ============================================================
+   STARTER CITY
+   Meridian Heights already exists when you take office \u2014 you're
+   not founding it from a blank field. This seeds a small,
+   deliberately undersized downtown core so growth immediately
+   creates real decisions (services lag population, etc).
+   ============================================================ */
+function seedStarterCity(){
+  const cx = Math.floor(GRID_W/2), cy = Math.floor(GRID_H/2);
+  const setCell = (x,y,patch)=>{ if(inBounds(x,y)) Object.assign(STATE.grid[y][x], patch); };
+
+  // Main Street running east-west, plus one cross street
+  for(let x=cx-7; x<=cx+7; x++) setCell(x, cy, {road:true});
+  for(let y=cy-4; y<=cy+4; y++) setCell(cx, y, {road:true});
+  // a second parallel street one block north and south for a real block structure
+  for(let x=cx-7; x<=cx+7; x++){ setCell(x, cy-2, {road:true}); setCell(x, cy+2, {road:true}); }
+
+  // Downtown commercial frontage along Main Street, already lightly developed
+  [-6,-5,-4,-3,3,4,5,6].forEach(dx=>{
+    setCell(cx+dx, cy-1, {t:'zone', zoneKind:'com', dev: Math.random()<0.6?2:1});
+    setCell(cx+dx, cy+1, {t:'zone', zoneKind:'com', dev: Math.random()<0.5?1:0});
+  });
+
+  // Established residential blocks just off downtown
+  for(let dx=-6; dx<=6; dx++){
+    if(dx===0) continue;
+    setCell(cx+dx, cy-3, {t:'zone', zoneKind:'res', dev: Math.random()<0.5?2:1});
+    setCell(cx+dx, cy+3, {t:'zone', zoneKind:'res', dev: Math.random()<0.5?1:1});
+  }
+
+  // A small industrial pocket near the old rail corridor, east side of town
+  for(let dy=-1; dy<=1; dy++){ setCell(cx+9, cy+dy, {road:true}); }
+  setCell(cx+8, cy-1, {t:'zone', zoneKind:'ind', dev:1});
+  setCell(cx+8, cy+1, {t:'zone', zoneKind:'ind', dev:1});
+
+  // Core civic services \u2014 intentionally minimal so coverage gaps show up fast as the city grows
+  setCell(cx-2, cy-4, {t:'civic', toolId:'water'});
+  setCell(cx+2, cy-4, {t:'civic', toolId:'police'});
+  setCell(cx-3, cy+4, {t:'civic', toolId:'school'});
+  setCell(cx+1, cy+5, {t:'civic', toolId:'park'});
+
+  // The Threefoot Building already stands \u2014 it's the city's historic anchor, not something
+  // a brand-new mayor would build from scratch.
+  setCell(cx, cy-1, {t:'landmark', landmarkKey:'threefoot'});
+  STATE.landmarksBuilt.threefoot = true;
+
+  recomputeCoverage();
+}
+
 function startGame(){
   const mayorInput = document.getElementById('mayorname').value.trim();
   const cityInput = document.getElementById('cityinput').value.trim();
@@ -1184,6 +1301,7 @@ function startGame(){
   STATE.diff = chosenDiff;
   STATE.treasury = DIFFICULTIES[chosenDiff].treasury;
   STATE.started = true;
+  seedStarterCity();
   closeModal('startmodal');
   checkAchievements();
   logFlavor(`${STATE.mayorName} is sworn in as Mayor of ${STATE.cityName}. The city band, somewhat out of tune, plays anyway.`);
