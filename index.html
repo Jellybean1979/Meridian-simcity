@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Hizzoner: Meridian Heights</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   Palette: city-hall-at-night with brass municipal accent
+   --ink-0:   #0d1117  (near-black backdrop, "after hours" city hall)
+   --ink-1:   #161b22  (panel base)
+   --ink-2:   #1f2630  (panel raised)
+   --ink-3:   #2a3340  (borders/dividers)
+   --brass:   #c9a14a  (the signature accent - brass plaque/seal gold)
+   --brass-d: #8f7430  (brass shadow/pressed)
+   --paper:   #e8e2d0  (ledger paper / cream text on dark)
+   --slate:   #8b96a5  (secondary text)
+   --good:    #4f9d6e  (approval up / surplus)
+   --warn:    #c98a3a  (caution)
+   --bad:     #c14b4b  (deficit / crisis)
+   --water:   #3a6e8f  (zoning: civic/water)
+   --resi:    #5a8f5a  (zoning: residential)
+   --comm:    #3a7fa0  (zoning: commercial)
+   --indu:    #a0703a  (zoning: industrial)
+   Type:
+   - Display: "Oswald" (condensed, government-signage feel) - used sparingly, headers only
+   - Body: "Source Sans 3" / system sans - readable at small sizes on dashboard
+   - Data/mono: "JetBrains Mono" - ledger numbers, ticker, code-like data
+   Signature element: the brass-rimmed City Seal + a hand-lettered "Mayor's Desk" 
+   memo ticker that behaves like a nameplate read-out.
+   ============================================================ */
+:root{
+  --ink-0:#0d1117; --ink-1:#161b22; --ink-2:#1f2630; --ink-3:#2a3340;
+  --brass:#c9a14a; --brass-d:#8f7430; --brass-bright:#e0bd6e;
+  --paper:#e8e2d0; --slate:#8b96a5; --slate-dim:#5b6573;
+  --good:#4f9d6e; --good-d:#356b4a; --warn:#c98a3a; --bad:#c14b4b; --bad-d:#7d2f2f;
+  --water:#3a6e8f; --resi:#5a8f5a; --comm:#3a7fa0; --indu:#a0703a; --civic:#9a6fb0; --park:#4f9d6e;
+  --radius:6px;
+  --font-display:'Oswald',sans-serif;
+  --font-body:'Source Sans 3','Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','Consolas',monospace;
+}
+@font-face{font-family:'Oswald';src:local('Oswald');}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:var(--ink-0);color:var(--paper);font-family:var(--font-body);overflow:hidden;}
+button{font-family:inherit;cursor:pointer;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:var(--ink-1);}
+::-webkit-scrollbar-thumb{background:var(--ink-3);border-radius:4px;}
+::-webkit-scrollbar-thumb:hover{background:var(--brass-d);}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+}
+
+/* ---------- App shell ---------- */
+#app{display:flex; flex-direction:column; height:100vh; width:100vw;}
+
+/* ---------- Top bar ---------- */
+#topbar{
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(180deg,var(--ink-2),var(--ink-1));
+  border-bottom:2px solid var(--brass-d);
+  padding:8px 14px;
+  flex-shrink:0;
+  z-index:50;
+}
+.seal{
+  width:40px;height:40px;border-radius:50%;
+  border:2px solid var(--brass);
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 35% 30%, #243042, #11161d);
+  flex-shrink:0;
+  box-shadow:0 0 0 3px var(--ink-0), 0 0 8px rgba(201,161,74,0.3);
+}
+.seal svg{width:26px;height:26px;}
+#cityname{
+  font-family:var(--font-display); font-weight:600; letter-spacing:0.5px;
+  font-size:18px; color:var(--brass-bright); text-transform:uppercase;
+  line-height:1.1;
+}
+#cityname small{display:block;font-family:var(--font-body);font-size:10px;color:var(--slate);text-transform:none;letter-spacing:0.3px;font-weight:400;}
+
+.topstats{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;}
+.stat-chip{
+  background:var(--ink-1); border:1px solid var(--ink-3); border-radius:var(--radius);
+  padding:4px 10px; display:flex; flex-direction:column; min-width:74px;
+}
+.stat-chip .lbl{font-size:9px; color:var(--slate); text-transform:uppercase; letter-spacing:0.6px;}
+.stat-chip .val{font-family:var(--font-mono); font-size:14px; font-weight:600;}
+.stat-chip .val.good{color:var(--good);}
+.stat-chip .val.bad{color:var(--bad);}
+.stat-chip .val.warn{color:var(--warn);}
+
+#speedctrl{display:flex; gap:4px; align-items:center; margin-left:8px;}
+.speedbtn{
+  background:var(--ink-1); border:1px solid var(--ink-3); color:var(--slate);
+  width:30px;height:30px;border-radius:var(--radius); font-size:13px;
+  display:flex;align-items:center;justify-content:center;
+}
+.speedbtn.active{background:var(--brass-d); color:var(--ink-0); border-color:var(--brass);}
+.speedbtn:hover{border-color:var(--brass);}
+
+#datebox{font-family:var(--font-mono); font-size:12px; color:var(--paper); text-align:right; line-height:1.3; margin-left:6px;}
+#datebox .week{color:var(--slate); font-size:10px;}
+
+/* ---------- Main layout ---------- */
+#main{display:flex; flex:1; min-height:0;}
+
+/* ---------- Left: tool palette ---------- */
+#toolbar{
+  width:108px; background:var(--ink-1); border-right:1px solid var(--ink-3);
+  overflow-y:auto; padding:8px 6px; flex-shrink:0;
+  display:flex; flex-direction:column; gap:6px;
+}
+.tool-group-label{font-size:9px;color:var(--slate);text-transform:uppercase;letter-spacing:0.6px;padding:6px 4px 2px;font-family:var(--font-display);}
+.tool-btn{
+  background:var(--ink-2); border:1px solid var(--ink-3); border-radius:var(--radius);
+  padding:6px 4px; display:flex; flex-direction:column; align-items:center; gap:3px;
+  color:var(--paper); font-size:9.5px; text-align:center; line-height:1.15;
+  position:relative;
+}
+.tool-btn .ic{font-size:18px;}
+.tool-btn:hover{border-color:var(--brass);}
+.tool-btn.selected{background:var(--brass-d); border-color:var(--brass); color:var(--ink-0);}
+.tool-btn.selected .ic{filter:none;}
+.tool-btn .cost{font-family:var(--font-mono); font-size:8.5px; color:var(--slate);}
+.tool-btn.selected .cost{color:var(--ink-0);}
+.tool-btn:disabled{opacity:0.35; cursor:not-allowed;}
+
+/* ---------- Center: map viewport ---------- */
+#mapwrap{flex:1; position:relative; overflow:hidden; background:#070a0e;}
+#mapscroll{position:absolute; inset:0; overflow:auto;}
+#gridcanvas{display:block; cursor:crosshair;}
+#hoverinfo{
+  position:absolute; pointer-events:none; background:rgba(13,17,23,0.95);
+  border:1px solid var(--brass); border-radius:var(--radius); padding:6px 9px;
+  font-family:var(--font-mono); font-size:11px; color:var(--paper); z-index:30;
+  display:none; max-width:220px; line-height:1.4;
+}
+#hoverinfo .h-title{color:var(--brass-bright); font-weight:600; margin-bottom:2px; font-family:var(--font-body);}
+
+#mapcontrols{position:absolute; bottom:10px; right:10px; display:flex; flex-direction:column; gap:4px; z-index:20;}
+#mapcontrols button{
+  width:32px;height:32px; background:rgba(22,27,34,0.92); border:1px solid var(--ink-3);
+  border-radius:var(--radius); color:var(--paper); font-size:16px;
+}
+#mapcontrols button:hover{border-color:var(--brass);}
+
+/* ---------- Bottom ticker (signature element) ---------- */
+#ticker-wrap{
+  height:34px; background:var(--ink-1); border-top:2px solid var(--brass-d);
+  display:flex; align-items:center; overflow:hidden; flex-shrink:0; position:relative;
+}
+#ticker-label{
+  background:var(--brass-d); color:var(--ink-0); font-family:var(--font-display);
+  font-size:11px; letter-spacing:0.6px; text-transform:uppercase; padding:0 12px;
+  height:100%; display:flex; align-items:center; flex-shrink:0; z-index:2;
+  box-shadow:4px 0 8px -2px rgba(0,0,0,0.5);
+}
+#ticker-track{display:flex; white-space:nowrap; will-change:transform;}
+.ticker-item{font-family:var(--font-mono); font-size:12.5px; color:var(--paper); padding:0 26px; flex-shrink:0;}
+.ticker-item::before{content:"\2756"; color:var(--brass); margin-right:10px;}
+
+/* ---------- Right: advisor / info panel ---------- */
+#sidepanel{
+  width:330px; background:var(--ink-1); border-left:1px solid var(--ink-3);
+  display:flex; flex-direction:column; flex-shrink:0;
+}
+#tabs{display:flex; border-bottom:1px solid var(--ink-3); flex-shrink:0;}
+.tab-btn{
+  flex:1; background:var(--ink-1); border:none; color:var(--slate); padding:9px 4px;
+  font-family:var(--font-display); font-size:11px; text-transform:uppercase; letter-spacing:0.4px;
+  border-bottom:2px solid transparent;
+}
+.tab-btn.active{color:var(--brass-bright); border-bottom-color:var(--brass);}
+#panelcontent{flex:1; overflow-y:auto; padding:12px;}
+
+.advisor-card{
+  background:var(--ink-2); border:1px solid var(--ink-3); border-radius:var(--radius);
+  padding:10px; margin-bottom:10px; display:flex; gap:10px;
+}
+.advisor-portrait{
+  width:42px;height:42px; border-radius:50%; flex-shrink:0; display:flex; align-items:center;
+  justify-content:center; font-size:19px; border:2px solid var(--brass-d);
+  background:var(--ink-3);
+}
+.advisor-body{flex:1; min-width:0;}
+.advisor-name{font-weight:700; font-size:12.5px; color:var(--paper);}
+.advisor-title{font-size:10px; color:var(--brass); margin-bottom:4px;}
+.advisor-msg{font-size:12px; color:var(--slate); line-height:1.4;}
+.advisor-msg b{color:var(--paper); font-weight:600;}
+
+.section-title{
+  font-family:var(--font-display); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;
+  color:var(--brass); margin:14px 0 8px; padding-bottom:4px; border-bottom:1px solid var(--ink-3);
+}
+.section-title:first-child{margin-top:0;}
+
+.ledger-row{display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding:3px 0; color:var(--paper);}
+.ledger-row span:first-child{color:var(--slate);}
+.ledger-row.total{border-top:1px solid var(--ink-3); margin-top:4px; padding-top:6px; font-weight:700;}
+.ledger-row .pos{color:var(--good);}
+.ledger-row .neg{color:var(--bad);}
+
+.barline{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+.barline .blabel{font-size:11px; color:var(--slate); width:78px; flex-shrink:0;}
+.barline .btrack{flex:1; height:7px; background:var(--ink-3); border-radius:4px; overflow:hidden;}
+.barline .bfill{height:100%; border-radius:4px;}
+.barline .bval{font-family:var(--font-mono); font-size:11px; width:32px; text-align:right; flex-shrink:0;}
+
+.event-card{
+  background:var(--ink-2); border-left:3px solid var(--brass); border-radius:var(--radius);
+  padding:9px 10px; margin-bottom:8px; font-size:12px; line-height:1.4;
+}
+.event-card.crisis{border-left-color:var(--bad);}
+.event-card.good{border-left-color:var(--good);}
+.event-card .ev-head{font-weight:700; color:var(--paper); margin-bottom:3px; font-size:12.5px;}
+.event-card .ev-choices{display:flex; flex-direction:column; gap:5px; margin-top:7px;}
+.event-card button.choice{
+  background:var(--ink-3); border:1px solid var(--ink-3); color:var(--paper); border-radius:4px;
+  padding:6px 8px; font-size:11.5px; text-align:left;
+}
+.event-card button.choice:hover{border-color:var(--brass);}
+.event-card .ev-cost{color:var(--slate); font-family:var(--font-mono); font-size:10.5px;}
+
+.policy-row{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--ink-3); font-size:12px;}
+.policy-row:last-child{border-bottom:none;}
+.policy-name{flex:1;}
+.policy-desc{font-size:10.5px; color:var(--slate);}
+.toggle{
+  width:38px;height:20px; background:var(--ink-3); border-radius:10px; position:relative; flex-shrink:0; border:1px solid var(--ink-3);
+}
+.toggle.on{background:var(--good-d); border-color:var(--good);}
+.toggle::after{content:""; position:absolute; width:14px;height:14px; background:var(--paper); border-radius:50%; top:2px; left:2px; transition:left 0.15s;}
+.toggle.on::after{left:21px;}
+
+.ach-card{display:flex; align-items:center; gap:9px; padding:7px; border-radius:var(--radius); margin-bottom:6px; background:var(--ink-2);}
+.ach-card.locked{opacity:0.4;}
+.ach-icon{font-size:20px; width:28px; text-align:center;}
+.ach-name{font-size:12px; font-weight:600;}
+.ach-desc{font-size:10.5px; color:var(--slate);}
+
+.btn{
+  background:var(--brass-d); color:var(--ink-0); border:1px solid var(--brass); border-radius:var(--radius);
+  padding:8px 12px; font-weight:600; font-size:12.5px; width:100%;
+}
+.btn:hover{background:var(--brass);}
+.btn.secondary{background:var(--ink-3); color:var(--paper); border-color:var(--ink-3);}
+.btn.secondary:hover{border-color:var(--brass);}
+.btn.danger{background:var(--bad-d); border-color:var(--bad); color:var(--paper);}
+
+/* ---------- Modals ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(7,10,14,0.82); display:flex; align-items:center;
+  justify-content:center; z-index:200; backdrop-filter:blur(2px);
+}
+.modal-overlay.hidden{display:none;}
+.modal-box{
+  background:var(--ink-1); border:1px solid var(--brass-d); border-radius:8px;
+  max-width:480px; width:90%; max-height:84vh; overflow-y:auto; padding:22px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+}
+.modal-box h2{
+  font-family:var(--font-display); color:var(--brass-bright); text-transform:uppercase;
+  letter-spacing:0.5px; font-size:20px; margin:0 0 4px;
+}
+.modal-box .sub{color:var(--slate); font-size:12.5px; margin-bottom:16px;}
+.modal-box label{display:block; font-size:11.5px; color:var(--slate); margin:10px 0 4px; text-transform:uppercase; letter-spacing:0.4px;}
+.modal-box input[type=text]{
+  width:100%; background:var(--ink-2); border:1px solid var(--ink-3); border-radius:var(--radius);
+  padding:9px 10px; color:var(--paper); font-size:14px; font-family:var(--font-body);
+}
+.modal-box input[type=text]:focus{outline:none; border-color:var(--brass);}
+.diff-options{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
+.diff-opt{
+  background:var(--ink-2); border:1px solid var(--ink-3); border-radius:var(--radius); padding:10px;
+  text-align:left; color:var(--paper);
+}
+.diff-opt:hover{border-color:var(--brass);}
+.diff-opt b{display:block; color:var(--brass-bright); font-size:13px; margin-bottom:2px;}
+.diff-opt span{font-size:11.5px; color:var(--slate);}
+
+/* News flash modal */
+#newsflash .modal-box{border-color:var(--brass);}
+#newsflash .flash-tag{
+  display:inline-block; background:var(--bad-d); color:var(--paper); font-size:10px;
+  padding:2px 8px; border-radius:3px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;
+}
+#newsflash .flash-tag.good{background:var(--good-d);}
+#newsflash .flash-tag.achieve{background:var(--brass-d); color:var(--ink-0);}
+
+/* ---------- Easter egg toast ---------- */
+#eggtoast{
+  position:fixed; bottom:46px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--ink-1); border:1px solid var(--brass); border-radius:8px; padding:10px 16px;
+  display:flex; align-items:center; gap:10px; z-index:150; opacity:0; transition:all 0.3s;
+  pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,0.5); max-width:360px;
+}
+#eggtoast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+#eggtoast .egg-ic{font-size:22px;}
+#eggtoast .egg-t{font-size:12px; line-height:1.35;}
+#eggtoast .egg-t b{color:var(--brass-bright); display:block; font-size:12.5px;}
+
+.smallnote{font-size:10.5px; color:var(--slate-dim); margin-top:4px; line-height:1.4;}
+
+@media (max-width:900px){
+  #sidepanel{width:260px;}
+  #toolbar{width:88px;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <div id="topbar">
+    <div class="seal">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="none" stroke="#c9a14a" stroke-width="3"/><text x="50" y="40" font-size="13" fill="#e0bd6e" text-anchor="middle" font-family="Oswald, sans-serif">EST.</text><text x="50" y="62" font-size="18" fill="#e0bd6e" text-anchor="middle" font-family="Oswald, sans-serif" font-weight="700">MH</text></svg>
+    </div>
+    <div id="cityname">CITY OF MERIDIAN HEIGHTS<small id="mayorline">Office of the Mayor</small></div>
+    <div class="topstats">
+      <div class="stat-chip"><span class="lbl">Treasury</span><span class="val" id="stat-treasury">$0</span></div>
+      <div class="stat-chip"><span class="lbl">Population</span><span class="val" id="stat-pop">0</span></div>
+      <div class="stat-chip"><span class="lbl">Approval</span><span class="val" id="stat-approval">0%</span></div>
+      <div class="stat-chip"><span class="lbl">Net /wk</span><span class="val" id="stat-net">$0</span></div>
+      <div class="stat-chip"><span class="lbl">Unemp.</span><span class="val" id="stat-unemp">0%</span></div>
+    </div>
+    <div id="speedctrl">
+      <button class="speedbtn" id="spd-pause" title="Pause">&#10073;&#10073;</button>
+      <button class="speedbtn active" id="spd-1" title="Normal">&#9654;</button>
+      <button class="speedbtn" id="spd-2" title="Fast">&#9654;&#9654;</button>
+      <button class="speedbtn" id="spd-3" title="Turbo">&#9654;&#9654;&#9654;</button>
+    </div>
+    <div id="datebox"><div id="date-main">Week 1, Year 1</div><div class="week" id="term-line">Term 1 &middot; Week 1 of 208</div></div>
+  </div>
+
+  <!-- ============ MAIN AREA ============ -->
+  <div id="main">
+
+    <!-- Tool palette -->
+    <div id="toolbar"></div>
+
+    <!-- Map -->
+    <div id="mapwrap">
+      <div id="mapscroll">
+        <canvas id="gridcanvas"></canvas>
+      </div>
+      <div id="hoverinfo"></div>
+      <div id="mapcontrols">
+        <button id="zoom-in">+</button>
+        <button id="zoom-out">&minus;</button>
+        <button id="zoom-reset">&#8853;</button>
+      </div>
+    </div>
+
+    <!-- Side panel -->
+    <div id="sidepanel">
+      <div id="tabs">
+        <button class="tab-btn active" data-tab="advisors">Staff</button>
+        <button class="tab-btn" data-tab="budget">Budget</button>
+        <button class="tab-btn" data-tab="city">City</button>
+        <button class="tab-btn" data-tab="policy">Policy</button>
+        <button class="tab-btn" data-tab="achievements">Awards</button>
+      </div>
+      <div id="panelcontent"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ TICKER ============ -->
+  <div id="ticker-wrap">
+    <div id="ticker-label">WMER&nbsp;News</div>
+    <div id="ticker-track"></div>
+  </div>
+
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-overlay" id="startmodal">
+  <div class="modal-box">
+    <h2>Inauguration Day</h2>
+    <div class="sub">Meridian Heights awaits its newly elected mayor. Built where the rails of the old Gulf, Mobile &amp; Heritage Line used to cross, this Mississippi-flavored city is yours to shape.</div>
+    <label>Your name, Mayor</label>
+    <input type="text" id="mayorname" placeholder="e.g. Mayor Threefoot" maxlength="24">
+    <label>Name your city</label>
+    <input type="text" id="cityinput" placeholder="Meridian Heights" maxlength="26">
+    <label>Choose your difficulty</label>
+    <div class="diff-options" id="diffoptions">
+      <button class="diff-opt" data-diff="easy"><b>Steel Magnolia (Easy)</b><span>Generous starting treasury, forgiving budget, fewer crises.</span></button>
+      <button class="diff-opt" data-diff="normal"><b>Crossties (Normal)</b><span>Balanced budget pressure and a realistic pace of crises.</span></button>
+      <button class="diff-opt" data-diff="hard"><b>Queen City Grit (Hard)</b><span>Tight treasury, demanding voters, frequent curveballs.</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="newsflash">
+  <div class="modal-box">
+    <span class="flash-tag" id="flash-tag">BREAKING</span>
+    <h2 id="flash-title">Headline</h2>
+    <div class="sub" id="flash-body">Body text</div>
+    <div id="flash-choices"></div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="electionmodal">
+  <div class="modal-box">
+    <span class="flash-tag" id="elect-tag">ELECTION NIGHT</span>
+    <h2 id="elect-title">Election Results</h2>
+    <div class="sub" id="elect-body"></div>
+    <button class="btn" id="elect-continue">Continue</button>
+  </div>
+</div>
+
+<div id="eggtoast"><span class="egg-ic">&#11088;</span><div class="egg-t"></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>
