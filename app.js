@@ -391,6 +391,11 @@ function recomputePopulationAndEconomy(){
   }
   if(STATE.policies.recycling) pol *= 0.75;
   if(STATE.policies.smokestackRules) pol *= 0.7;
+  // Parks act as green buffers \u2014 better park coverage trims pollution even with no policy active.
+  const parkCoverage = STATE.servicesCoverage.park || 0;
+  pol *= (1 - Math.min(0.3, parkCoverage*0.003));
+  // Bonita Lakes Park (landmark) is a larger green space and gives a flat additional offset.
+  if(STATE.landmarksBuilt.bonita) pol -= 4;
   STATE.pollution = Math.max(0, Math.min(100, Math.round(pol)));
 
   let crime = 35 - (STATE.servicesCoverage.police||0)*0.32 + STATE.unemployment*0.25;
@@ -1028,7 +1033,7 @@ function advisorAdvice(){
   lines.push({ key:'fire', text:`${(cov.fire||0)<40 && STATE.population>800 ? 'Fire coverage is thin in the newer districts. A station would help response times.' : 'Response times look acceptable across most of the city.'}` });
   lines.push({ key:'health', text:`${(cov.health||0)<40 && STATE.population>1000 ? 'We\u2019re short on clinic coverage for a city this size.' : 'Public health indicators are stable.'}` });
   lines.push({ key:'education', text:`${(cov.school||0)<50 && STATE.population>500 ? 'I\u2019d like to talk about another school when the budget allows.' : 'Enrollment and capacity are roughly in balance.'}` });
-  lines.push({ key:'enviro', text:`Pollution index: <b>${STATE.pollution}</b>. ${STATE.pollution>40?'Recycling or smokestack rules would help, even if industry grumbles.':'Air and water quality look fine for now.'}` });
+  lines.push({ key:'enviro', text:`Pollution index: <b>${STATE.pollution}</b>. ${STATE.pollution>40?'Recycling or smokestack rules would help, but so would more parks near the industrial side of town \u2014 or just thinning out the densest industrial blocks.':'Air and water quality look fine for now.'}` });
   lines.push({ key:'pio', text:`${STATE.population>3000 && !STATE.landmarksBuilt.threefoot ? 'A restored landmark like the Threefoot Building would make for a great press story.' : 'Press coverage has been fairly quiet this week.'}` });
   return lines;
 }
@@ -1170,10 +1175,22 @@ function renderHelpTab(){
     <li>A healthy city usually keeps jobs (commercial + industrial) roughly in balance with population, so check unemployment before zoning more housing.</li>
   </ul></div>`;
 
+  html += `<div class="section-title">Cutting Pollution</div>`;
+  html += `<div class="help-block">
+    <p>Pollution comes almost entirely from developed industrial tiles, plus a smaller amount from Power Plants and Landfills. The Recycling and Smokestack Rules policies are the most direct levers, but they're not the only ones:</p>
+    <ul>
+      <li><b>Parks act as a green buffer.</b> Better park coverage trims pollution citywide, even with no policy active \u2014 it's not just a happiness boost.</li>
+      <li><b>Bonita Lakes Park</b> (the landmark) gives a flat pollution reduction on top of regular parks once built.</li>
+      <li><b>Bulldoze or thin out your densest industrial blocks.</b> Pollution scales with industrial development level, so a few high-density industrial tiles can outweigh several low-density ones \u2014 spreading industry out or downsizing it works immediately, no policy required.</li>
+      <li>Power Plants and Landfills add a flat amount of pollution just by existing. If you have more than you need, removing one helps more than any policy will.</li>
+    </ul>
+  </div>`;
+
   html += `<div class="section-title">Money Troubles</div>`;
   html += `<div class="help-block">
     <p>Running a deficit isn\u2019t an instant game over \u2014 your treasury can go negative, and the city keeps running, just with a real approval penalty. If you ever face a crisis event you genuinely can\u2019t afford, every event includes a way to decline or go into debt rather than locking you out \u2014 there\u2019s always a "table this for now" option at the bottom of any newsflash.</p>
   </div>`;
+
 
   html += `<div class="section-title">Starting City</div>`;
   html += `<div class="help-block">
